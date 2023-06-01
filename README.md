@@ -1,2 +1,2 @@
 # RepeatedEconomicSanctions
-Investigating the effect of repeated sanctions imposition on their ability to extract policy concessions
+Investigating the effect of repeated sanctions imposition on their ability to extract policy concessions (BA thesis project).
