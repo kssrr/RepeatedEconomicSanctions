@@ -10,27 +10,38 @@ library(fixest)
 
 ties <- readr::read_csv("ties_custom.csv")
 
-# Maximalist definition of sanctions:
-models_maximalist <- list(
-  "Naive" = lm(
-    success ~ prior, 
-    data = ties
-  ),
-  "Panel" = feols(
-    success ~ prior,
-    data = ties,
-    panel.id = c("dyad", "startyear"),
-    fixef = "dyad",
-    vcov = "white"
-  ),
-  "Panel (DK)" = feols(
-    success ~ prior, 
-    data = ties, 
-    panel.id = c("dyad", "startyear"),
-    fixef = "dyad",
-    vcov = "DK"
+# Same routine for different definitions of independent and dependent variable:
+create_models <- function(independent, dependent) {
+  formula <- reformulate(independent, response = dependent)
+
+  # Return a list of models:
+  list(
+    # Naive linear model:
+    "Naive" = lm(
+      formula,
+      data = ties
+    ),
+    # Panel linear model, dyad FE, white SE:
+    "Panel" = feols(
+      formula,
+      data = ties,
+      panel.id = c("dyad", "startyear"),
+      fixef = "dyad",
+      vcov = "white"
+    ),
+    # Panel linear model, dyad FE, Driscoll-Kraay SE:
+    "Panel (DK)" = feols(
+      formula,
+      data = ties,
+      panel.id = c("dyad", "startyear"),
+      fixef = "dyad",
+      vcov = "DK"
+    )
   )
-)
+}
+
+# Maximalist definition of sanctions:
+models_maximalist <- create_models("prior", "success")
 
 modelsummary(
   models_maximalist,
@@ -47,26 +58,7 @@ modelsummary(
 )
 
 # Minimalist definition (including negotiated settlements):
-models_minimalist <- list(
-  "Naive" = lm(
-    success_min ~ prior, 
-    data = ties
-  ),
-  "Panel" = feols(
-    success_min ~ prior, 
-    data = ties, 
-    panel.id = c("dyad", "startyear"),
-    fixef = "dyad",
-    vcov = "white"
-  ),
-  "Panel (DK)" = feols(
-    success_min ~ prior, 
-    data = ties, 
-    panel.id = c("dyad", "startyear"),
-    fixef = "dyad",
-    vcov = "DK"
-  )
-)
+models_minimalist <- create_models("prior", "success_min")
 
 modelsummary(
   models_minimalist,
@@ -83,90 +75,12 @@ modelsummary(
 )
 
 # Looking at sanctions within last five/ten years:
+five <- create_models("within_last_five", "success")
+five_min <- create_models("within_last_five", "success_min")
 
-five <- list(
-  "Naive" = lm(
-    success ~ within_last_five, 
-    data = ties
-  ),
-  "Panel" = feols(
-    success ~ within_last_five, 
-    data = ties, 
-    panel.id = c("dyad", "startyear"),
-    fixef = "dyad",
-    vcov = "white"
-  ),
-  "Panel (DK)" = feols(
-    success ~ within_last_five, 
-    data = ties, 
-    panel.id = c("dyad", "startyear"),
-    fixef = "dyad",
-    vcov = "DK"
-  )
-)
+ten <- create_models("within_last_ten", "success")
+ten_min <- create_models("within_last_ten", "success_min")
 
-five_min <- list(
-  "Naive" = lm(
-    success_min ~ within_last_five, 
-    data = ties
-  ),
-  "Panel" = feols(
-    success_min ~ within_last_five, 
-    data = ties, 
-    panel.id = c("dyad", "startyear"),
-    fixef = "dyad",
-    vcov = "white"
-  ),
-  "Panel (DK)" = feols(
-    success_min ~ within_last_five, 
-    data = ties, 
-    panel.id = c("dyad", "startyear"),
-    fixef = "dyad",
-    vcov = "DK"
-  )
-)
-
-ten <- list(
-  "Naive" = lm(
-    success ~ within_last_ten, 
-    data = ties
-  ),
-  "Panel" = feols(
-    success ~ within_last_ten, 
-    data = ties, 
-    panel.id = c("dyad", "startyear"),
-    fixef = "dyad",
-    vcov = "white"
-  ),
-  "Panel (DK)" = feols(
-    success ~ within_last_ten, 
-    data = ties, 
-    panel.id = c("dyad", "startyear"),
-    fixef = "dyad",
-    vcov = "DK"
-  )
-)
-
-ten_min <- list(
-  "Naive" = lm(
-    success_min ~ within_last_ten, 
-    data = ties
-  ),
-  "Panel" = feols(
-    success_min ~ within_last_ten, 
-    data = ties, 
-    panel.id = c("dyad", "startyear"),
-    fixef = "dyad",
-    vcov = "white"
-  ),
-  "Panel (DK)" = feols(
-    success_min ~ within_last_ten, 
-    data = ties, 
-    panel.id = c("dyad", "startyear"),
-    fixef = "dyad",
-    vcov = "DK"
-  )
-)
 
 full_time_based <- c(ten, ten_min, five, five_min)
 
@@ -209,32 +123,18 @@ tidy_models <- function(models, def) {
     )
 }
 
-models <- rbind(
-  tidy_models(
-    models_maximalist, 
-    def = "Overall \n(Maximalist)"
-  ),
-  tidy_models(
-    models_minimalist, 
-    def = "Overall \n(Minimalist)"
-  ),
-  tidy_models(
-    ten, 
-    def = "Within last 10 years \n(Maximalist)"
-  ),
-  tidy_models(
-    ten_min, 
-    def = "Within last 10 years \n(Minimalist)"
-  ),
-  tidy_models(
-    five, 
-    def = "Within last 5 years \n(Maximalist)"
-  ),
-  tidy_models(
-    five_min, 
-    def = "Within last 5 years \n(Minimalist)"
-  )
+models <- list(
+  "Overall (Maximalist)" = models_maximalist,
+  "Overall (Minimalist)" = models_minimalist,
+  "Within last 10 years \n(Maximalist)" = ten,
+  "Within last 10 years \n(Minimalist)" = ten_min,
+  "Within last 5 years \n(Maximalist)" = five,
+  "Within last 5 years \n(Minimalist)" = five_min
 )
+
+models <-
+  map2(models, names(models), \(model, def) tidy_models(model, def)) |>
+  reduce(rbind)
 
 models |> 
   ggplot(
