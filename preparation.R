@@ -12,7 +12,6 @@ download.file(
 )
 
 ties <- readxl::read_xls("ties4-1.xls")
-#cow <- readr::read_csv("https://correlatesofwar.org/wp-content/uploads/COW-country-codes.csv")
 cow <- readr::read_csv("https://correlatesofwar.org/wp-content/uploads/COW-country-codes.csv")
 
 ties <- 
