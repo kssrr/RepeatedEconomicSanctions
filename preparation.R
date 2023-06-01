@@ -1,17 +1,19 @@
-setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+#setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
-library(plm)
 library(dplyr)
 library(tidyr)
 library(forcats)
 library(ggplot2)
 library(purrr)
-library(lmtest)
-library(sandwich)
 
-ties <- readxl::read_xls("TIESv4-1.xls")
+download.file(
+  "https://sanctions.web.unc.edu/wp-content/uploads/sites/18834/2021/04/TIESv4-1.xls",
+  "ties4-1.xls"
+)
+
+ties <- readxl::read_xls("ties4-1.xls")
 #cow <- readr::read_csv("https://correlatesofwar.org/wp-content/uploads/COW-country-codes.csv")
-cow <- readr::read_csv("COW-country-codes.csv")
+cow <- readr::read_csv("https://correlatesofwar.org/wp-content/uploads/COW-country-codes.csv")
 
 ties <- 
   ties |> 
@@ -94,7 +96,7 @@ ties <-
   ties |> 
   mutate(
     success = ifelse(finaloutcome %in% c(6, 7), 1, 0),
-    success_min = ifelse(finaloutcome %in% c(6, 7, 10), 1, 0)
+    success_min = ifelse(finaloutcome %in% c(6, 7, 10), 1, 0) # 10 = negotiated settlement after imposition
   )
 
 # Non-directional Dyad:
@@ -185,4 +187,4 @@ for_success |>
   count(success_min) |> 
   mutate(`%` = n / 845)
 
-bwrite.csv(ties, "ties_custom.csv")
+write.csv(ties, "ties_custom.csv")

@@ -1,4 +1,4 @@
-setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+#setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 library(dplyr)
 library(purrr)
@@ -16,12 +16,12 @@ models_maximalist <- list(
     success ~ prior, 
     data = ties
   ),
-  "Panel" = plm(
+  "Panel" = feols(
     success ~ prior,
     data = ties,
-    index = "dyad",
-    effect = "individual",
-    model = "within"
+    panel.id = c("dyad", "startyear"),
+    fixef = "dyad",
+    vcov = "white"
   ),
   "Panel (DK)" = feols(
     success ~ prior, 
@@ -52,12 +52,12 @@ models_minimalist <- list(
     success_min ~ prior, 
     data = ties
   ),
-  "Panel" = plm(
-    success_min ~ prior,
-    data = ties,
-    index = "dyad",
-    effect = "individual",
-    model = "within"
+  "Panel" = feols(
+    success_min ~ prior, 
+    data = ties, 
+    panel.id = c("dyad", "startyear"),
+    fixef = "dyad",
+    vcov = "white"
   ),
   "Panel (DK)" = feols(
     success_min ~ prior, 
@@ -89,12 +89,12 @@ five <- list(
     success ~ within_last_five, 
     data = ties
   ),
-  "Panel" = plm(
-    success ~ within_last_five,
-    data = ties,
-    index = "dyad",
-    effect = "individual",
-    model = "within"
+  "Panel" = feols(
+    success ~ within_last_five, 
+    data = ties, 
+    panel.id = c("dyad", "startyear"),
+    fixef = "dyad",
+    vcov = "white"
   ),
   "Panel (DK)" = feols(
     success ~ within_last_five, 
@@ -110,12 +110,12 @@ five_min <- list(
     success_min ~ within_last_five, 
     data = ties
   ),
-  "Panel" = plm(
-    success_min ~ within_last_five,
-    data = ties,
-    index = "dyad",
-    effect = "individual",
-    model = "within"
+  "Panel" = feols(
+    success_min ~ within_last_five, 
+    data = ties, 
+    panel.id = c("dyad", "startyear"),
+    fixef = "dyad",
+    vcov = "white"
   ),
   "Panel (DK)" = feols(
     success_min ~ within_last_five, 
@@ -131,12 +131,12 @@ ten <- list(
     success ~ within_last_ten, 
     data = ties
   ),
-  "Panel" = plm(
-    success ~ within_last_ten,
-    data = ties,
-    index = "dyad",
-    effect = "individual",
-    model = "within"
+  "Panel" = feols(
+    success ~ within_last_ten, 
+    data = ties, 
+    panel.id = c("dyad", "startyear"),
+    fixef = "dyad",
+    vcov = "white"
   ),
   "Panel (DK)" = feols(
     success ~ within_last_ten, 
@@ -152,12 +152,12 @@ ten_min <- list(
     success_min ~ within_last_ten, 
     data = ties
   ),
-  "Panel" = plm(
-    success_min ~ within_last_ten,
-    data = ties,
-    index = "dyad",
-    effect = "individual",
-    model = "within"
+  "Panel" = feols(
+    success_min ~ within_last_ten, 
+    data = ties, 
+    panel.id = c("dyad", "startyear"),
+    fixef = "dyad",
+    vcov = "white"
   ),
   "Panel (DK)" = feols(
     success_min ~ within_last_ten, 
@@ -257,3 +257,6 @@ models |>
   ) +
   coord_flip()
 
+## ties |>
+##   mutate(duration = endyear - sancstartyear) |>
+##   summarise(dur = mean(duration, na.rm = TRUE))
