@@ -1,6 +1,6 @@
 # RepeatedEconomicSanctions
 
-Investigating the effect of repeated sanctions imposition on their ability to extract policy concessions (BA thesis project).
+*BA-thesis project.* Drawing on the ["Threat and Imposition of Economic Sanctions" (TIES)](https://sanctions.web.unc.edu/) data set, I consider an unbalanced panel of sender-target dyads to examine, whether the number of previously imposed sanctions in a dyad has a negative effect of newly imposed sanctions to extract policy concessions. 
 
 To reproduce, first run `preparation.R`, then run `modelling.R`. The data should be directly pulled from the online sources. 
 
