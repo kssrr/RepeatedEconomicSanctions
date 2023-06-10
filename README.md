@@ -431,3 +431,5 @@ To reproduce, first run `preparation.R`, then run `modelling.R`. The data should
 <sup></sup> * p &lt; 0.1, ** p &lt; 0.05, *** p &lt; 0.01</td></tr></tfoot>
 </table>
 
+### Graphically
+![effects](https://github.com/kssrr/RepeatedEconomicSanctions/assets/121236725/d396d243-212b-4049-822e-96aa03406c13)
