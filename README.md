@@ -11,6 +11,9 @@ To reproduce, first run `preparation.R`, then run `modelling.R`. The data should
 * *Minimalist*: Including negotiated settlements of the sanctions episode as successful.
 * *Maximalist*: Only counting complete or partial acquiescence by the target state to sender demands as successful.
 
+- *Naive:* Naive linear model.
+- *Panel:* Panel linear model with dyad fixed-effects and [Driscoll-Kraay standard errors](https://www.researchgate.net/profile/John-Driscoll-6/publication/311788557_Consistent_covariance_matrix_estimation_with_spatially_dependent_data/links/5b0d4b380f7e9b1ed7fd6035/Consistent-covariance-matrix-estimation-with-spatially-dependent-data.pdf)
+
 <table style="NAborder-bottom: 0; width: auto !important; margin-left: auto; margin-right: auto;" class="table">
  <thead>
 <tr>
