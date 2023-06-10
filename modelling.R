@@ -11,7 +11,7 @@ library(fixest)
 ties <- readr::read_csv("ties_custom.csv")
 
 # Same routine for different definitions of independent and dependent variable:
-create_models <- function(independent, dependent) {
+fit_models <- function(independent, dependent) {
   formula <- reformulate(independent, response = dependent)
 
   # Return a list of models:
@@ -21,92 +21,97 @@ create_models <- function(independent, dependent) {
       formula,
       data = ties
     ),
-    # Panel linear model, dyad FE, white SE:
+    # Panel linear model, dyad FE, Driscoll-Kraay SE:
     "Panel" = feols(
       formula,
       data = ties,
-      panel.id = c("dyad", "startyear"),
-      fixef = "dyad",
-      vcov = "white"
-    ),
-    # Panel linear model, dyad FE, Driscoll-Kraay SE:
-    "Panel (DK)" = feols(
-      formula,
-      data = ties,
-      panel.id = c("dyad", "startyear"),
+      panel.id = c("dyad", "sancstartyear"),
       fixef = "dyad",
       vcov = "DK"
     )
   )
 }
 
-# Maximalist definition of sanctions:
-models_maximalist <- create_models("prior", "success")
+regtable <- function(models, ...) {
+  modelsummary(
+    models,
+    stars = c("*" = .1, "**" = .05, "***" = .01),
+    coef_omit = "Intercept",
+    gof_omit = "Log.Lik",
+    ...
+  )
+}
 
-modelsummary(
-  models_maximalist,
-  stars = c("*" = .1, "**" = .05, "***" = .01),
-  coef_omit = "Intercept",
-  coef_rename = c("Prior Sanctions" = "prior"),
-  gof_omit = "Log.Lik.|Std.Errors|FE: dyad|R2 Within|F",
-  add_rows = tribble(
-    ~ name, ~naive, ~panel, ~panel_dk,
-    "FE (dyad)", "No",    "Yes",    "Yes",
-    "Std. Errors", "", "", "Driscoll-Kray (L=2)"
-  ),
-  output = "ZZZ_results_maximalist.tex"
-)
+# Overall:
 
-# Minimalist definition (including negotiated settlements):
-models_minimalist <- create_models("prior", "success_min")
+models_minimalist <- fit_models("prior", "success_min") # incl. negotiated 
+models_maximalist <- fit_models("prior", "success") # excl. negotiated
 
-modelsummary(
-  models_minimalist,
-  stars = c("*" = .1, "**" = .05, "***" = .01),
-  coef_omit = "Intercept",
-  coef_rename = c("Prior Sanctions" = "prior"),
-  gof_omit = "Log.Lik.|Std.Errors|FE: dyad|R2 Within|F",
-  add_rows = tribble(
-    ~ name, ~naive, ~panel, ~panel_dk,
-    "FE (dyad)", "No",    "Yes",    "Yes",
-    "Std. Errors", "", "", "Driscoll-Kray (L=2)"
-  ),
-  output = "ZZZ_results_minimalist.tex"
-)
+c(models_minimalist, models_maximalist) |> 
+  regtable(coef_rename = c("prior" = "Prior Sanctions")) |> 
+  add_header_above(
+    c(
+      " " = 1,
+      "Success \n(Minimalist)" = 2,
+      "Success \n(Maximalist)" = 2
+    )
+  )
 
 # Looking at sanctions within last five/ten years:
-five <- create_models("within_last_five", "success")
-five_min <- create_models("within_last_five", "success_min")
 
-ten <- create_models("within_last_ten", "success")
-ten_min <- create_models("within_last_ten", "success_min")
+five <- fit_models("within_last_five", "success")
+five_min <- fit_models("within_last_five", "success_min")
+ten <- fit_models("within_last_ten", "success")
+ten_min <- fit_models("within_last_ten", "success_min")
 
 
 full_time_based <- c(ten, ten_min, five, five_min)
 
-to_print <- modelsummary(
-  full_time_based,
-  stars = c("*" = .1, "**" = .05, "***" = .01),
-  coef_omit = "Intercept",
-  coef_rename = c(
-    "within_last_ten" = "Prior Sanctions (last 10 years)",
-    "within_last_five" = "Prior Sanctions (last 5 years)"
-  ),
-  gof_omit = "Log.Lik.|Std.Errors|FE: dyad|R2 Within|F"
-)
-
-to_print |> 
+full_time_based |>
+  regtable(
+    coef_rename = c(
+      "within_last_ten" = "Prior Sanctions (last 10 years)",
+      "within_last_five" = "Prior Sanctions (last 5 years)"
+    )
+  ) |> 
   add_header_above(
     c(
       " " = 1, 
-      "Maximalist" = 3, 
-      "Minimalist" = 3, 
-      "Maximalist" = 3,
-      "Minimalist" = 3
+      "Success \n(Maximalist)" = 2, 
+      "Success \n(Minimalist)" = 2, 
+      "Success \n(Maximalist)" = 2,
+      "Success \n(Minimalist)" = 2
     )
-  ) |> 
-  kable(format = "latex") #|> 
-  save_kable("ZZZ_results_time_based.tex")
+  ) 
+
+# Dummy (prior sanctions vs. no prior sanctions):
+
+dummy_max <- fit_models("prior_dummy", "success")
+dummy_min <- fit_models("prior_dummy", "success_min")
+
+c(dummy_min, dummy_max) |> 
+  regtable(coef_rename = c("prior_dummy" = "Prior Sanctions (dummy)")) |> 
+  add_header_above(
+    c(
+      " " = 1,
+      "Success \n(Minimalist)" = 2,
+      "Success \n(Maximalist)" = 2
+    )
+  )
+
+# Initial sanction dummy:
+initial_max <- fit_models("first_sanction", "success")
+initial_min <- fit_models("first_sanction", "success_min")
+
+c(initial_min, initial_max) |> 
+  regtable(coef_rename = c("first_sanction" = "Initial Sanction")) |> 
+  add_header_above(
+    c(
+      " " = 1,
+      "Success \n(Minimalist)" = 2,
+      "Success \n(Maximalist)" = 2
+    )
+  )
 
 # Visually (all models):
 

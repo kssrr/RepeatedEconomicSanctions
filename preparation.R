@@ -90,6 +90,17 @@ ties <-
   ) |> 
   ungroup()
 
+# Imputing imposition year (5 cases):
+ties <- 
+  ties |> 
+  mutate(sancstartyear = ifelse(is.na(sancstartyear), startyear, sancstartyear))
+
+# add dummy for prior sanctions:
+ties <- ties |> mutate(prior_dummy = ifelse(prior > 0, 1, 0))
+
+# add dummy for initial sanction (= no prior sanctions):
+ties <- ties |> mutate(first_sanction = ifelse(prior == 0, 1, 0))
+
 # Add success:
 ties <- 
   ties |> 
