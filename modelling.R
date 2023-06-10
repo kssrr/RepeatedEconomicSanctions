@@ -55,7 +55,7 @@ c(models_minimalist, models_maximalist) |>
       "Success \n(Minimalist)" = 2,
       "Success \n(Maximalist)" = 2
     )
-  )
+  ) 
 
 # Looking at sanctions within last five/ten years:
 
@@ -82,7 +82,7 @@ full_time_based |>
       "Success \n(Maximalist)" = 2,
       "Success \n(Minimalist)" = 2
     )
-  ) 
+  )
 
 # Dummy (prior sanctions vs. no prior sanctions):
 
