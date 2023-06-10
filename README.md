@@ -5,7 +5,7 @@ Investigating the effect of repeated sanctions imposition on their ability to ex
 To reproduce, first run `preparation.R`, then run `modelling.R`. The data should be directly pulled from the online sources. 
 
 ## Results
-|<table style="NAborder-bottom: 0; width: auto !important; margin-left: auto; margin-right: auto;" class="table">
+<table style="NAborder-bottom: 0; width: auto !important; margin-left: auto; margin-right: auto;" class="table">
  <thead>
 <tr>
 <th style="empty-cells: hide;border-bottom:hidden;" colspan="1"></th>
@@ -115,6 +115,6 @@ To reproduce, first run `preparation.R`, then run `modelling.R`. The data should
 </tbody>
 <tfoot><tr><td style="padding: 0; " colspan="100%">
 <sup></sup> * p &lt; 0.1, ** p &lt; 0.05, *** p &lt; 0.01</td></tr></tfoot>
-</table> |
+</table>
 
 
