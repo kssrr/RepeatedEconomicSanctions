@@ -1,4 +1,4 @@
-#setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 library(dplyr)
 library(purrr)
@@ -11,7 +11,7 @@ library(fixest)
 ties <- readr::read_csv("ties_custom.csv")
 
 # Same routine for different definitions of independent and dependent variable:
-fit_models <- function(independent, dependent) {
+fit_models <- function(independent, dependent, data = ties) {
   formula <- reformulate(independent, response = dependent)
 
   # Return a list of models:
@@ -19,12 +19,12 @@ fit_models <- function(independent, dependent) {
     # Naive linear model:
     "Naive" = lm(
       formula,
-      data = ties
+      data = data
     ),
     # Panel linear model, dyad FE, Driscoll-Kraay SE:
     "Panel" = feols(
       formula,
-      data = ties,
+      data = data,
       panel.id = c("dyad", "sancstartyear"),
       fixef = "dyad",
       vcov = "DK"
@@ -36,82 +36,35 @@ regtable <- function(models, ...) {
   modelsummary(
     models,
     stars = c("*" = .1, "**" = .05, "***" = .01),
-    coef_omit = "Intercept",
-    gof_omit = "Log.Lik",
+    gof_omit = "Log.Lik|BIC|F$",
     ...
   )
 }
 
-# Overall:
+# Naive linear model & Dyad Fixed-Effects:
 
-models_minimalist <- fit_models("prior", "success_min") # incl. negotiated 
-models_maximalist <- fit_models("prior", "success") # excl. negotiated
+models_minimalist <- fit_models("prior_non_overlapping", "success_min") # incl. negotiated 
+models_maximalist <- fit_models("prior_non_overlapping", "success") # excl. negotiated
 
-c(models_minimalist, models_maximalist) |> 
-  regtable(coef_rename = c("prior" = "Prior Sanctions")) |> 
-  add_header_above(
-    c(
-      " " = 1,
-      "Success \n(Minimalist)" = 2,
-      "Success \n(Maximalist)" = 2
-    )
-  ) 
+# Manually fitting the models with covariates:
+with_cov_max <- feols(
+  success ~ prior_non_overlapping + power_diff + formal_alliance + polyarchy_sender + polyarchy_target,
+  data = ties,
+  vcov = "DK",
+  panel.id = c("dyad", "sancstartyear"),
+  fixef = "dyad"
+)
 
-# Looking at sanctions within last five/ten years:
+with_cov_min <- feols(
+  success_min ~ prior_non_overlapping + power_diff + formal_alliance + polyarchy_sender + polyarchy_target,
+  data = ties,
+  vcov = "DK",
+  panel.id = c("dyad", "sancstartyear"),
+  fixef = "dyad"
+)
 
-five <- fit_models("within_last_five", "success")
-five_min <- fit_models("within_last_five", "success_min")
-ten <- fit_models("within_last_ten", "success")
-ten_min <- fit_models("within_last_ten", "success_min")
-
-
-full_time_based <- c(ten, ten_min, five, five_min)
-
-full_time_based |>
-  regtable(
-    coef_rename = c(
-      "within_last_ten" = "Prior Sanctions (last 10 years)",
-      "within_last_five" = "Prior Sanctions (last 5 years)"
-    )
-  ) |> 
-  add_header_above(
-    c(
-      " " = 1, 
-      "Success \n(Maximalist)" = 2, 
-      "Success \n(Minimalist)" = 2, 
-      "Success \n(Maximalist)" = 2,
-      "Success \n(Minimalist)" = 2
-    )
-  )
-
-# Dummy (prior sanctions vs. no prior sanctions):
-
-dummy_max <- fit_models("prior_dummy", "success")
-dummy_min <- fit_models("prior_dummy", "success_min")
-
-c(dummy_min, dummy_max) |> 
-  regtable(coef_rename = c("prior_dummy" = "Prior Sanctions (dummy)")) |> 
-  add_header_above(
-    c(
-      " " = 1,
-      "Success \n(Minimalist)" = 2,
-      "Success \n(Maximalist)" = 2
-    )
-  )
-
-# Initial sanction dummy:
-initial_max <- fit_models("first_sanction", "success")
-initial_min <- fit_models("first_sanction", "success_min")
-
-c(initial_min, initial_max) |> 
-  regtable(coef_rename = c("first_sanction" = "Initial Sanction")) |> 
-  add_header_above(
-    c(
-      " " = 1,
-      "Success \n(Minimalist)" = 2,
-      "Success \n(Maximalist)" = 2
-    )
-  )
+models_maximalist$`Panel with Covariates` <- with_cov_max
+models_minimalist$`Panel with Covariates` <- with_cov_min
 
 # Visually (all models):
 
@@ -119,7 +72,7 @@ tidy_models <- function(models, def) {
   models |> 
     map(broom::tidy) |> 
     map2(names(models), \(df, n) df |> mutate(model = n)) |> 
-    map(\(df) df |> filter(term != "(Intercept)")) |> 
+    map(\(df) df |> filter(term == "prior_non_overlapping")) |> 
     reduce(rbind) |> 
     mutate(
       definition = def,
@@ -129,12 +82,8 @@ tidy_models <- function(models, def) {
 }
 
 models <- list(
-  "Overall (Maximalist)" = models_maximalist,
-  "Overall (Minimalist)" = models_minimalist,
-  "Within last 10 years \n(Maximalist)" = ten,
-  "Within last 10 years \n(Minimalist)" = ten_min,
-  "Within last 5 years \n(Maximalist)" = five,
-  "Within last 5 years \n(Minimalist)" = five_min
+  "Excl. negotiated settlements" = models_maximalist,
+  "Incl. negotiated settlements" = models_minimalist
 )
 
 models <-
@@ -146,10 +95,10 @@ models |>
     aes(x = factor(definition), y = estimate, color = model, shape = model)
   ) +
   geom_hline(yintercept = 0, lty = "dotted", color = "grey50") +
-  geom_point(position = position_dodge(width = .3), size = 2) +
+  geom_point(position = position_dodge(width = .2), size = 2) +
   geom_errorbar(
     aes(ymin = lower, ymax = upper), 
-    position = position_dodge(width = .3),
+    position = position_dodge(width = .2),
     width = 0.2
   ) +
   theme_minimal() +
@@ -162,6 +111,90 @@ models |>
   ) +
   coord_flip()
 
-## ties |>
-##   mutate(duration = endyear - sancstartyear) |>
-##   summarise(dur = mean(duration, na.rm = TRUE))
+c(models_maximalist, models_minimalist) |> 
+  regtable(
+    coef_rename = c(
+      "prior_non_overlapping" = "Prior Sanctions",
+      "power_diff" = "Power Difference (Sender-Target)",
+      "formal_alliance" = "Formal Alliance",
+      "polyarchy_sender" = "Polyarchy - Sender",
+      "polyarchy_target" = "Polyarchy - Target"
+    ),
+    coef_omit = "Intercept",
+    format = "latex"
+  ) |> 
+  add_header_above(
+    c(
+      " " = 1,
+      "Success \n(Excl. negotiated settlements)" = 3,
+      "Success \n(Incl. negotiated settlements)" = 3
+    )
+  )
+
+c(models_maximalist, models_minimalist) |> 
+  regtable(
+    coef_rename = c("prior_non_overlapping" = "Prior Sanctions"),
+    coef_omit = "Intercept|power_diff|formal_alliance|polyarchy_*",
+    format = "latex"
+  ) |> 
+  add_header_above(
+    c(
+      " " = 1,
+      "Success \n(Excl. negotiated settlements)" = 3,
+      "Success \n(Incl. negotiated settlements)" = 3
+    )
+  )
+
+# Robustness
+
+# Non-US sanctions:
+usa <- ties |> filter(sender == "USA")
+no_usa <- ties |> filter(sender != "USA") 
+
+usa_max <- fit_models("prior_non_overlapping", "success", data = usa)
+usa_min <- fit_models("prior_non_overlapping", "success_min", data = usa)
+
+usa_max_wcov <- feols(
+  success ~ prior_non_overlapping + power_diff + formal_alliance + polyarchy_sender + polyarchy_target,
+  data = usa,
+  vcov = "DK",
+  panel.id = c("dyad", "sancstartyear"),
+  fixef = "dyad"
+)
+
+usa_min_wcov <- feols(
+  success_min ~ prior_non_overlapping + power_diff + formal_alliance + polyarchy_sender + polyarchy_target,
+  data = usa,
+  vcov = "DK",
+  panel.id = c("dyad", "sancstartyear"),
+  fixef = "dyad"
+)
+
+usa_max$`Panel with Covariates` <- usa_max_wcov
+usa_min$`Panel with Covariates` <- usa_min_wcov
+
+c(usa_max, usa_min) |> regtable()
+
+no_usa_max <- fit_models("prior_non_overlapping", "success", data = no_usa)
+no_usa_min <- fit_models("prior_non_overlapping", "success_min", data = no_usa)
+
+no_usa_max_wcov <- feols(
+  success ~ prior_non_overlapping + power_diff + formal_alliance + polyarchy_sender + polyarchy_target,
+  data = no_usa,
+  vcov = "DK",
+  panel.id = c("dyad", "sancstartyear"),
+  fixef = "dyad"
+)
+
+no_usa_min_wcov <- feols(
+  success_min ~ prior_non_overlapping + power_diff + formal_alliance + polyarchy_sender + polyarchy_target,
+  data = no_usa,
+  vcov = "DK",
+  panel.id = c("dyad", "sancstartyear"),
+  fixef = "dyad"
+)
+
+no_usa_max$`Panel with Covariates` <- usa_max_wcov
+no_usa_min$`Panel with Covariates` <- usa_min_wcov
+
+c(no_usa_max, no_usa_min) |> regtable()
