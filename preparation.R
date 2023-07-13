@@ -4,6 +4,7 @@ library(dplyr)
 library(tidyr)
 library(forcats)
 library(ggplot2)
+library(cowplot)
 library(purrr)
 
 # You will have to download the zipped VDem .csv manually from 
@@ -44,6 +45,8 @@ cinc <- readr::read_csv("NMC/data_abridged/NMC-60-abridged.csv")
 alliances <- readr::read_csv("alliances/version4.1_csv/alliance_v4.1_by_dyad_yearly.csv")
 vdem <- readr::read_csv("vdem/V-Dem-CY-Core-v13.csv")
 wars <- readr::read_csv("interstate_wars/directed_dyadic_war.csv")
+gdp <- haven::read_dta("pwt1001.dta")
+trade <- readr::read_csv("trade_full.csv")
 
 ties <- 
   ties |> 
@@ -128,7 +131,7 @@ alliances <-
   rename("id1" = iso) |> 
   left_join(cow |> select(-full), by = c("ccode2" = "code")) |> 
   rename("id2" = iso) |> 
-  filter(year >= 1945 & year <= 2005) |> 
+  filter(year >= 1944 & year <= 2006) |> 
   select(id1, id2, year, defense:entente) |> 
   mutate(
     dyad1 = map2_chr(id1, id2, make_dyad_code),
@@ -146,6 +149,9 @@ alliances <-
   ungroup() |> 
   mutate(across(defense:entente, \(x) ifelse(x > 0, 1, 0)))
 
+# To add lag:
+alliances <- alliances |> mutate(year = year + 1)
+
 ties <- 
   ties |> 
   left_join(alliances, by = c("dyad", "sancstartyear" = "year")) |> 
@@ -156,6 +162,9 @@ ties$formal_alliance <- ifelse(rowSums(ties[, alliance_vars]) > 0, 1, 0)
 
 # Add Composite indicator of national capabilities (CINC; measure for "power"):
 # Needed: deal with EU?
+
+cinc <- cinc |> mutate(year = year +1)
+
 ties <- 
   ties |> 
   left_join(
@@ -187,63 +196,62 @@ ties <-
   left_join(vdem, by = c("targetstate" = "ccode", "sancstartyear" = "year")) |> 
   rename("polyarchy_target" = "polyarchy")
 
-# Interstate wars:
-# Creating a dummy whether the two countries in the dyad went to war within the
-# last decade (for every year from 1945 to 2005):
-wars <- 
-  wars |> 
-  select(statea, stateb, year) |> 
-  left_join(cow |> select(-full), by = c("statea" = "code")) |> 
-  rename("state1" = iso) |> 
-  left_join(cow |> select(-full), by = c("stateb" = "code")) |> 
-  rename("state2" = iso) |> 
-  mutate(dyad = map2_chr(state1, state2, \(x, y) paste0(x, "-", y))) |> 
-  select(dyad, year) |> 
-  filter(year >= 1935 & year <= 2005) |> 
-  mutate(war = 1)
-
-template <- tibble(dyad = unique(wars$dyad))
-
-wars <- 
-  template |> 
-  # ChatGPT taught me this trick:
-  mutate(year = map2(1935, 2005, `:`)) |> 
-  unnest(year) |> 
-  left_join(wars, by = c("dyad", "year")) |> 
-  mutate(war = ifelse(is.na(war), 0, war))
-
-wars <- 
-  wars |> 
-  group_by(dyad) |> 
+# gdp:
+gdp_clean <- 
+  gdp |> 
+  select("iso3" = countrycode, year, "gdp" = rgdpo) |> 
   mutate(
-    war_last_10 = ifelse(zoo::rollapply(war, 10, sum, fill = 1, align = "right") > 0, 1, 0)
+    ccode = countrycode::countrycode(iso3, "iso3c", "gwn"),
+    year = year + 1
   ) |> 
-  ungroup() |> 
-  filter(year >= 1945) |> 
-  select(-war)
+  filter(!is.na(ccode))
 
 ties <- 
   ties |> 
-  left_join(wars, by = c("dyad", "sancstartyear" = "year")) |> 
-  mutate(war_last_10 = ifelse(is.na(war_last_10), 0, war_last_10))
+  left_join(
+    gdp_clean |> select(gdp, year, ccode), 
+    by = c("targetstate" = "ccode", "sancstartyear" = "year")
+  ) |> 
+  rename("target_gdp" = gdp) |> 
+  left_join(
+    gdp_clean |> select(gdp, year, ccode), 
+    by = c("primarysender" = "ccode", "sancstartyear" = "year")
+  ) |> 
+  rename("sender_gdp" = gdp)
 
+# Trade dependence
+
+trade <- 
+  trade |> 
+  mutate(
+    dependence = trade_volume_with_sender / target_total_volume,
+    year = year + 1
+  ) |> 
+  select(dyad, year, dependence) |> 
+  filter(!is.na(dependence))
+
+ties <- ties |> left_join(trade, by = c("dyad", "sancstartyear" = "year"))
 # Some EDA:
 
 # most sanctioned dyad:
 top_dyads <- 
   ties |> 
-  filter(!is.na(primarysender)) |> 
-  #count(dyad) |>
   mutate(
     dyad_full = map2_chr(sender_full, target_full, \(x, y) paste(x, "on", y)),
     dyad_full = stringr::str_replace(dyad_full, "United States of America", "USA")
   ) |> 
-  count(dyad_full) |> 
-  arrange(desc(n)) |> 
+  group_by(dyad_full) |> 
+  summarise(prior = max(prior_non_overlapping)) |> 
+  arrange(desc(prior)) |> 
   head(10) |> 
-  ggplot(aes(x = n, y = fct_reorder(dyad_full, n))) +
+  ggplot(aes(x = prior, y = fct_reorder(dyad_full, prior))) +
   geom_col() +
-  labs(x = "Number of sanctions", y = "Dyad (Sender First)", title = "Dyads") +
+  labs(
+    x = "Number of Sanctions", 
+    y = "Dyad (Sender First)", 
+    title = "Dyads",
+    caption = "= maximum number of prior, non-overlapping\nsanctions in the dyad"
+  ) +
   theme_minimal()
 
 # Most prolific senders:
@@ -258,7 +266,22 @@ top_senders <-
   labs(x = "Number of Sanctions Imposed", y = "Sender", title = "Senders") +
   theme_minimal()
 
-cowplot::plot_grid(top_senders, top_dyads)
+top_targets <- 
+  ties |> 
+  ungroup() |> 
+  count(target_full) |> 
+  arrange(desc(n)) |> 
+  head(10) |> 
+  ggplot(aes(x = n, y = fct_reorder(target_full, n))) +
+  geom_col() +
+  labs(x = "Number of Sanctions Imposed On", y = "Target", title = "Targets") +
+  theme_minimal()
+
+plot_grid(
+  plot_grid(top_senders, top_targets, nrow = 1, ncol = 2),
+  plot_grid(NULL, top_dyads, NULL, nrow = 1, rel_widths = c(0.5, 1, 0.5)),
+  nrow = 2
+)
 
 # Most targeted:
 ties |> 
@@ -268,15 +291,16 @@ ties |>
 
 # Distribution of sanctions/dyad:
 ties |> 
-  ggplot(aes(x = prior_non_overlapping)) +
-  geom_histogram() +
-#  geom_vline(xintercept = mean(ties$number_imposed)) +
-#  annotate("text", label = "mean", x = 3, y = 410, angle = 90) +
-#  geom_vline(xintercept = median(ties$number_imposed)) +
-#  annotate("text", label = "median", x = 2.2, y = 405, angle = 90) +
+  count(prior_non_overlapping) |> 
+  ggplot(aes(x = prior_non_overlapping, y = n)) +
+  geom_col() +
   scale_x_continuous(breaks = seq(0, 8, 1)) +
-  labs(x = "Number of Sanctions (Dyad)", y = "N") +
+  labs(x = "Number of Previous Sanctions (Dyad)", y = "N") +
   theme_minimal()
+
+ties |> 
+  mutate(treated = ifelse(prior_non_overlapping > 0, 1, 0)) |> 
+  count(treated)
 
 # Showing that power relations are relatively persistent over time:
 top_dyads <- 
@@ -317,12 +341,69 @@ for_success <-
   ties |> 
   mutate(across(starts_with("success"), \(x) ifelse(x == 0, "Unsuccessful", "Successful")))
 
-for_success |> 
+maximalist <- 
+  for_success |> 
   count(success) |> 
-  mutate(`%` = n / 845)
+  mutate(`%` = n / sum(n), definition = "Maximalist \n(Excl. negotiated settlements)")
 
-for_success |> 
+minimalist <- 
+  for_success |> 
   count(success_min) |> 
-  mutate(`%` = n / 845)
+  rename("success" = success_min) |> 
+  mutate(`%` = n / sum(n), definition = "Minimalist \n(Incl. negotiated settlements)")
+
+rbind(maximalist, minimalist) |> 
+  ggplot(aes(x = success, y = n, fill = success)) +
+  geom_col() +
+  geom_text(
+    aes(label = paste0(as.character(round(`%` * 100, digits = 2)), "%")), 
+    vjust = -0.5
+  ) +
+  scale_fill_grey(start = 0.6, end = 0.4) +
+  facet_wrap(~definition) +
+  theme_minimal() +
+  labs(x = "", y = "N")
+
+# Success over time
+
+by_year <- 
+  ties |> 
+  group_by(sancstartyear) |> 
+  mutate(succ = ifelse(success == 1, "Yes", "No")) |> 
+  ggplot(aes(x = sancstartyear, fill = succ)) +
+  geom_bar() +
+  scale_fill_grey(start = 0.6, end = 0.4) +
+  scale_x_continuous(breaks = seq(1940, 2000, 10)) +
+  labs(
+    fill = "Successful?", 
+    x = "", 
+    y = "Number of Sanctions Imposed",
+    title = "By Year"
+  ) +
+  theme_minimal()
+
+# By decade:
+
+by_decade <- 
+  ties |> 
+  mutate(
+    decade = sancstartyear - sancstartyear %% 10, 
+    succ = ifelse(success == 1, "Yes", "No")
+  ) |> 
+  ggplot(aes(x = decade, fill = succ)) +
+  geom_bar() +
+  scale_fill_grey(start = 0.6, end = 0.4) +
+  scale_x_continuous(breaks = seq(1940, 2000, 10)) +
+  labs(
+    fill = "Successful?", 
+    x = "", 
+    y = "Number of Sanctions Imposed",
+    title = "By Decade"
+  ) +
+  theme_minimal()
+
+plot_grid(
+  by_year, by_decade, nrow = 2
+)
 
 write.csv(ties, "ties_custom.csv")
