@@ -513,6 +513,9 @@ models_2fe |>
 # I use plm for the Hausman-test since `plm::phtest()` is really convenient to use.
 # The model is fundamentally the same as above. 
 
+# The choice of fixed-effects was a "design" choice, but I still ran Hausman tests
+# to see whether it also made statistical sense.
+
 fixed_effects <- plm(
   success ~ prior_non_overlapping + log(sender_gdp) + log(target_gdp) + post_cold_war + cinc_sender + cinc_target + formal_alliance + polyarchy_sender + polyarchy_target + dependence, 
   data = ties, 
