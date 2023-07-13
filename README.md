@@ -6,4 +6,4 @@
 
 ## Reproducing
 
-All models are fit in `modelling.R`. The data set is generated in `preparation\_trade\_linkage.R` and `preparation.R`, in case you might want to reproduce the entire process of generating the data set. 
+All models are fit in `modelling.R`. The data set is generated in `preparation_trade_linkage.R` and `preparation.R`, in case you might want to reproduce the entire process of generating the data set. 
