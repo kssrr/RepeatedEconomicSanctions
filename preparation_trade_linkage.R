@@ -16,9 +16,8 @@ download.file(
 
 unzip("trade.zip", exdir = "trade", overwrite = TRUE)
 
-ties <- readr::read_csv("ties_custom.csv")
-national <- readr::read_csv("trade/National_COW_4.0.csv")
-dyadic <- readr::read_csv("trade/Dyadic_COW_4.0.csv")
+national <- readr::read_csv("trade/COW_Trade_4.0/National_COW_4.0.csv")
+dyadic <- readr::read_csv("trade/COW_Trade_4.0/Dyadic_COW_4.0.csv")
 cow <- readr::read_csv("https://correlatesofwar.org/wp-content/uploads/COW-country-codes.csv")
 
 dyadic[dyadic == -9] <- NA
@@ -90,16 +89,6 @@ full <-
     dyad = map2_chr(sender_state, target_state, \(x, y) paste0(x, "-", y))
   )
 
-# Adding data on sanctions:
-
-full <- 
-  ties |> 
-  select(dyad, "year" = sancstartyear) |> 
-  mutate(imposition = 1, year = year + 1) |> 
-  distinct() |> 
-  right_join(full, by = c("dyad", "year")) |> 
-  mutate(imposition = ifelse(is.na(imposition), 0, imposition))
-
 # Change in trade linkage:
 
 full <- 
@@ -113,57 +102,3 @@ full |>
   select(-change_in_trade_linkage) |> 
   distinct() |> 
   write.csv("trade_full.csv")
-
-cleaned <- 
-  full |> 
-  filter(is.finite(change_in_trade_linkage)) |> 
-  filter(change_in_trade_linkage < quantile(change_in_trade_linkage, .9))
-  
-oneway <- 
-  cleaned |> 
-  feols(
-    change_in_trade_linkage ~ imposition,
-    data = _,
-    panel.id = c("dyad", "year"),
-    fixef = "dyad",
-    vcov = ~dyad
-  )
-
-twoways <- 
-  cleaned |> 
-  feols(
-    change_in_trade_linkage ~ imposition,
-    data = _,
-    panel.id = c("dyad", "year"),
-    fixef = c("dyad", "year"),
-    vcov = ~dyad+year
-  )
-
-# Diminishing impact?
-template <- 
-  ties |> 
-  select(dyad) |> 
-  mutate(year = map2(1945, 2005, `:`)) |> 
-  unnest(year)
-
-to_join <- 
-  ties |> 
-  select(dyad, "year" = sancstartyear, prior_non_overlapping) |> 
-  distinct() |> 
-  group_by(dyad, year) |> 
-  summarise(prior = max(prior_non_overlapping)) |> 
-  ungroup()
-
-to_join <- 
-  template |> 
-  left_join(to_join, by = c("dyad", "year")) |> 
-  group_by(dyad) |> 
-  fill(prior, .direction = "down") |> 
-  mutate(prior = ifelse(is.na(prior), 0, prior)) |> 
-  ungroup()
-
-cleaned <- 
-  cleaned |> 
-  left_join(to_join, by = c("dyad", "year")) |> 
-  mutate(prior = ifelse(is.na(prior), 0, prior))
-  
